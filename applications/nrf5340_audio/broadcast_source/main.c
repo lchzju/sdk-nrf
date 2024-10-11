@@ -63,6 +63,10 @@ static struct bt_data ext_adv_buf[CONFIG_BT_ISO_MAX_BIG][CONFIG_EXT_ADV_BUF_MAX]
 /* Periodic advertising buffer. */
 static struct bt_data per_adv_buf[CONFIG_BT_ISO_MAX_BIG];
 
+static size_t ext_adv_buf_cnt = 0;
+static size_t per_adv_buf_cnt = 0;
+
+
 #if (CONFIG_AURACAST)
 /* Total size of the PBA buffer includes the 16-bit UUID, 8-bit features and the
  * meta data size.
@@ -136,6 +140,32 @@ static void button_msg_sub_thread(void)
 
 		switch (msg.button_pin) {
 		case BUTTON_PLAY_PAUSE:
+#if CONFIG_BT_AUDIO_HIGH_PRI_BROADCASTER
+			if (msg.button_state == BUTTON_PRESS) {
+				LOG_INF("RELEASE");
+				ret = led_on(LED_APP_RGB, LED_COLOR_MAGENTA);
+				if (ret) {
+					LOG_ERR("LED set failed");
+				}
+				ret = broadcast_source_stop(0);
+				if (ret) {
+					LOG_WRN("Failed to stop broadcaster: %d", ret);
+				}
+				bt_mgmt_per_adv_stop(0);
+				bt_mgmt_ext_adv_stop(0);
+			} else {
+				LOG_INF("PUSH");
+				ret = bt_mgmt_adv_start(0, ext_adv_buf[0], ext_adv_buf_cnt, &per_adv_buf[0],
+							per_adv_buf_cnt, false);
+				ERR_CHK_MSG(ret, "Failed to start first advertiser");
+
+				LOG_INF("Broadcast source: %s started", CONFIG_BT_AUDIO_BROADCAST_NAME);
+				ret = led_blink(LED_APP_RGB, LED_COLOR_RED);
+				if (ret) {
+					LOG_ERR("LED set failed");
+				}
+			}
+#else
 			if (strm_state == STATE_STREAMING) {
 				ret = broadcast_source_stop(0);
 				if (ret) {
@@ -149,7 +179,7 @@ static void button_msg_sub_thread(void)
 			} else {
 				LOG_WRN("In invalid state: %d", strm_state);
 			}
-
+#endif
 			break;
 
 		case BUTTON_4:
@@ -555,9 +585,6 @@ int main(void)
 
 	LOG_DBG("Main started");
 
-	size_t ext_adv_buf_cnt = 0;
-	size_t per_adv_buf_cnt = 0;
-
 	ret = nrf5340_audio_dk_init();
 	ERR_CHK(ret);
 
@@ -596,11 +623,12 @@ int main(void)
 	ERR_CHK(ret);
 
 	/* Start broadcaster */
+#if !CONFIG_BT_AUDIO_HIGH_PRI_BROADCASTER
 	ret = bt_mgmt_adv_start(0, ext_adv_buf[0], ext_adv_buf_cnt, &per_adv_buf[0],
 				per_adv_buf_cnt, false);
 	ERR_CHK_MSG(ret, "Failed to start first advertiser");
 
 	LOG_INF("Broadcast source: %s started", CONFIG_BT_AUDIO_BROADCAST_NAME);
-
+#endif
 	return 0;
 }
