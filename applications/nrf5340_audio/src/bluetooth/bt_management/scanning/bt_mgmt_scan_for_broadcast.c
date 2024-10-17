@@ -15,6 +15,7 @@
 #include <zephyr/sys/byteorder.h>
 #include <hci_core.h>
 
+#include "led.h"
 #include "bt_mgmt.h"
 #include "macros_common.h"
 #include "zbus_common.h"
@@ -206,9 +207,7 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 		LOG_DBG("Broadcast source %s found, id: 0x%06x", source.name, source.id);
 		periodic_adv_sync(info, source);
 		if (source.high_pri_stream) {
-			//led_on(LED_APP_RGB, LED_COLOR_RED);
-		} else {
-			//led_on(LED_APP_RGB, LED_COLOR_GREEN);
+			led_blink(LED_APP_RGB, LED_COLOR_RED);
 		}
 	}
 }
@@ -463,6 +462,7 @@ int bt_mgmt_scan_for_broadcast_start(struct bt_le_scan_param *scan_param, char c
 
 	ret = bt_le_scan_start(scan_param, NULL);
 	if (ret) {
+		LOG_ERR("bt_le_scan_start failed: %d", ret);
 		return ret;
 	}
 
