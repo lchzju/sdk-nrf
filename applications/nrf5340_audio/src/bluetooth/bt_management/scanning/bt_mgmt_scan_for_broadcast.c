@@ -20,6 +20,9 @@
 #include "macros_common.h"
 #include "zbus_common.h"
 
+#include <zephyr/sys/check.h>
+#include <zephyr/sys/util.h>
+
 #include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(bt_mgmt_scan);
 
@@ -93,8 +96,7 @@ static uint16_t interval_to_sync_timeout(uint16_t interval)
 	return (uint16_t)timeout;
 }
 
-void periodic_adv_sync(const struct bt_le_scan_recv_info *info,
-			      struct broadcast_source source)
+void periodic_adv_sync(const struct bt_le_scan_recv_info *info, struct broadcast_source source)
 {
 	int ret;
 	struct bt_le_per_adv_sync_param param;
@@ -121,6 +123,109 @@ void periodic_adv_sync(const struct bt_le_scan_recv_info *info,
 		return;
 	}
 	brcast_src_info = source;
+}
+
+struct search_type_param {
+	bool found;
+	uint8_t type;
+	uint8_t data_len;
+	const uint8_t **data;
+};
+
+static bool parse_cb(struct bt_data *data, void *user_data)
+{
+	struct search_type_param *param = (struct search_type_param *)user_data;
+
+	if (param->type == data->type) {
+		param->found = true;
+		param->data_len = data->data_len;
+		*param->data = data->data;
+
+		return false;
+	}
+
+	return true;
+}
+
+static int codec_meta_get_val(const uint8_t meta[], size_t meta_len,
+			      enum bt_audio_metadata_type type, const uint8_t **data)
+{
+	struct search_type_param param = {
+		.found = false,
+		.type = (uint8_t)type,
+		.data_len = 0,
+		.data = data,
+	};
+	int err;
+
+	CHECKIF(meta == NULL) {
+		LOG_DBG("meta is NULL");
+		return -EINVAL;
+	}
+
+	CHECKIF(data == NULL) {
+		LOG_DBG("data is NULL");
+		return -EINVAL;
+	}
+
+	*data = NULL;
+
+	err = bt_audio_data_parse(meta, meta_len, parse_cb, &param);
+	if (err != 0 && err != -ECANCELED) {
+		LOG_DBG("Could not parse the meta data: %d", err);
+		return err;
+	}
+
+	if (!param.found) {
+		return -ENODATA;
+	}
+
+	return param.data_len;
+}
+
+static int codec_meta_get_audio_active_state(const uint8_t meta[], size_t meta_len)
+{
+	const uint8_t *data;
+	int ret;
+
+	CHECKIF(meta == NULL) {
+		LOG_DBG("meta is NULL");
+		return -EINVAL;
+	}
+
+	ret = codec_meta_get_val(meta, meta_len, BT_AUDIO_METADATA_TYPE_AUDIO_STATE, &data);
+	if (data == NULL) {
+		return -ENODATA;
+	}
+
+	if (ret != sizeof(uint8_t)) {
+		return -EBADMSG;
+	}
+
+	return data[0];
+}
+
+static int codec_meta_get_stream_context(const uint8_t meta[], size_t meta_len)
+{
+	const uint8_t *data;
+	int ret;
+
+	CHECKIF(meta == NULL) {
+		LOG_DBG("meta is NULL");
+		return -EINVAL;
+	}
+
+	ret = codec_meta_get_val(meta, meta_len, BT_AUDIO_METADATA_TYPE_STREAM_CONTEXT, &data);
+	if (data == NULL) {
+		return -ENODATA;
+	}
+
+	if (ret != sizeof(uint16_t)) {
+		LOG_WRN("ret = 0x%X", ret);
+		return -EBADMSG;
+	}
+
+	return sys_get_le16(data);
 }
 
 /**
@@ -151,6 +256,17 @@ bool scan_check_broadcast_source(struct bt_data *data, void *user_data)
 			memcpy(&u16, &data->data[i], sizeof(u16));
 			uuid = BT_UUID_DECLARE_16(sys_le16_to_cpu(u16));
 			if (bt_uuid_cmp(uuid, BT_UUID_PBA) == 0) {
+				if ((codec_meta_get_stream_context(&data->data[4],
+								   data->data_len - 5) == 0x400) &&
+				    codec_meta_get_audio_active_state(&data->data[4],
+								      data->data_len - 5)) {
+					source->high_pri_stream = true;
+				}
+				/*
+				ret = codec_meta_get_stream_context(&data->data[4],
+				data->data_len-5); LOG_ERR("stream context: %d", ret); ret =
+				codec_meta_get_audio_active_state(&data->data[4], data->data_len-5);
+				LOG_ERR("active state: %d", ret);
 				LOG_HEXDUMP_INF(data->data, data->data_len, "");
 				if (data->data[3] > 0) {
 					if (data->data[7] == 4) {
@@ -158,6 +274,7 @@ bool scan_check_broadcast_source(struct bt_data *data, void *user_data)
 						source->high_pri_stream = true;
 					}
 				}
+				*/
 			} else if (bt_uuid_cmp(uuid, BT_UUID_BROADCAST_AUDIO) == 0) {
 				// LOG_HEXDUMP_INF(data->data, data->data_len, "audio broadcast");
 				source->id = sys_get_le24(data->data + BT_UUID_SIZE_16);
@@ -169,7 +286,6 @@ bool scan_check_broadcast_source(struct bt_data *data, void *user_data)
 	default:
 		break;
 	}
-
 
 	return true;
 }
@@ -199,7 +315,8 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 				return;
 			}
 
-		} else if (strncmp(source.name, srch_name, BLE_SEARCH_NAME_MAX_LEN) != 0 && !source.high_pri_stream) {
+		} else if (strncmp(source.name, srch_name, BLE_SEARCH_NAME_MAX_LEN) != 0 &&
+			   !source.high_pri_stream) {
 			/* Broadcaster does not match src_name */
 			return;
 		}
