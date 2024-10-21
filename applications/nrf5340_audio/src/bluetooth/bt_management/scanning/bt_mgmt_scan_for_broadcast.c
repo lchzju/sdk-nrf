@@ -262,19 +262,6 @@ bool scan_check_broadcast_source(struct bt_data *data, void *user_data)
 								      data->data_len - 5)) {
 					source->high_pri_stream = true;
 				}
-				/*
-				ret = codec_meta_get_stream_context(&data->data[4],
-				data->data_len-5); LOG_ERR("stream context: %d", ret); ret =
-				codec_meta_get_audio_active_state(&data->data[4], data->data_len-5);
-				LOG_ERR("active state: %d", ret);
-				LOG_HEXDUMP_INF(data->data, data->data_len, "");
-				if (data->data[3] > 0) {
-					if (data->data[7] == 4) {
-						LOG_WRN("Found high pri stream");
-						source->high_pri_stream = true;
-					}
-				}
-				*/
 			} else if (bt_uuid_cmp(uuid, BT_UUID_BROADCAST_AUDIO) == 0) {
 				// LOG_HEXDUMP_INF(data->data, data->data_len, "audio broadcast");
 				source->id = sys_get_le24(data->data + BT_UUID_SIZE_16);
