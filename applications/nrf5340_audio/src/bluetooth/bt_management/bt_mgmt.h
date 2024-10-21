@@ -61,6 +61,8 @@ enum bt_mgmt_scan_type {
 
 #define BRDCAST_ID_NOT_USED (BT_AUDIO_BROADCAST_ID_MAX + 1)
 
+bool scan_check_broadcast_source(struct bt_data *data, void *user_data);
+
 /**
  * @brief	Get the numbers of connected members of a given 'Set Identity Resolving Key' (SIRK).
  *		The SIRK shall be set through bt_mgmt_scan_sirk_set() before calling this function.

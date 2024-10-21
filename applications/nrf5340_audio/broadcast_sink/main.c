@@ -73,34 +73,6 @@ static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_UUID16_ALL, BT_UUID_16_ENCODE(BT_UUID_PACS_VAL)),
 };
 
-static bool scan_check_high_pri_audio(struct bt_data *data, void *user_data)
-{
-	struct broadcast_source *source = (struct broadcast_source *)user_data;
-	int i;
-	switch (data->type) {
-	case BT_DATA_SVC_DATA16:
-		for (i = 0; i < data->data_len; i += sizeof(uint16_t)) {
-			const struct bt_uuid *uuid;
-			uint16_t u16;
-			memcpy(&u16, &data->data[i], sizeof(u16));
-			uuid = BT_UUID_DECLARE_16(sys_le16_to_cpu(u16));
-			if (bt_uuid_cmp(uuid, BT_UUID_PBA) == 0) {
-				LOG_HEXDUMP_DBG(data->data, data->data_len, "");
-				if (data->data[3] > 0) {
-					if (data->data[7] == 4){
-						LOG_WRN("Found high pri stream");
-						source->high_pri_stream = true;
-					}
-				}
-			} else if (bt_uuid_cmp(uuid, BT_UUID_BROADCAST_AUDIO) == 0){
-				//LOG_HEXDUMP_INF(data->data, data->data_len, "audio broadcast");
-				source->id = sys_get_le24(data->data + BT_UUID_SIZE_16);
-				//LOG_WRN("found broadcast id %x", source->broadcast_id);
-			}
-		}
-	}
-	return true;
-}
 static struct bt_le_scan_recv_info store_info;
 static uint32_t store_broadcast_id;
 #include "bt_mgmt_scan_for_broadcast_internal.h"
@@ -115,7 +87,7 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 	if ((info->adv_props & BT_GAP_ADV_PROP_CONNECTABLE) || info->interval == 0) {
 		return;
 	}
-	bt_data_parse(ad, scan_check_high_pri_audio, (void *)&source);
+	bt_data_parse(ad, scan_check_broadcast_source, (void *)&source);
 	if(source.high_pri_stream) {
 		if (source.id != current_broadcast_id) {
 			LOG_ERR("should switch stream");

@@ -132,7 +132,7 @@ void periodic_adv_sync(const struct bt_le_scan_recv_info *info,
  * @retval	true	Continue to parse LTVs.
  * @retval	false	Stop parsing LTVs.
  */
-static bool scan_check_broadcast_source(struct bt_data *data, void *user_data)
+bool scan_check_broadcast_source(struct bt_data *data, void *user_data)
 {
 	struct broadcast_source *source = (struct broadcast_source *)user_data;
 
