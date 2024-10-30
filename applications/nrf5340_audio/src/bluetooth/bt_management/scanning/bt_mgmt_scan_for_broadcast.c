@@ -16,6 +16,7 @@
 #include <hci_core.h>
 
 #include "led.h"
+#include "channel_assignment.h"
 #include "bt_mgmt.h"
 #include "macros_common.h"
 #include "zbus_common.h"
@@ -312,6 +313,14 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 		periodic_adv_sync(info, source);
 		if (source.high_pri_stream) {
 			led_blink(LED_APP_RGB, LED_COLOR_RED);
+		} else {
+			enum audio_channel channel;
+			channel_assignment_get(&channel);
+			if (channel == AUDIO_CH_L) {
+				led_on(LED_APP_RGB, LED_COLOR_BLUE);
+			} else {
+				led_on(LED_APP_RGB, LED_COLOR_MAGENTA);
+			}
 		}
 	}
 }
