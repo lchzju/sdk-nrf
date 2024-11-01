@@ -41,7 +41,7 @@ DATA_FIFO_DEFINE(ble_fifo_rx, CONFIG_BUF_BLE_RX_PACKET_NUM, WB_UP(sizeof(struct 
 
 /* Callback for handling ISO RX */
 void le_audio_rx_data_handler(uint8_t const *const p_data, size_t data_size, bool bad_frame,
-			      uint32_t sdu_ref, enum audio_channel channel_index,
+			      uint32_t sdu_ref, uint8_t channel_index,
 			      size_t desired_data_size)
 {
 	int ret;

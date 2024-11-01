@@ -546,7 +546,7 @@ int main(void)
 	} else {
 		location = BT_AUDIO_LOCATION_FRONT_RIGHT;
 	}
-
+	location = (BT_AUDIO_LOCATION_FRONT_RIGHT | BT_AUDIO_LOCATION_FRONT_LEFT| BT_AUDIO_LOCATION_SIDE_RIGHT | BT_AUDIO_LOCATION_SIDE_LEFT);
 	ret = unicast_server_enable(le_audio_rx_data_handler, location);
 	ERR_CHK_MSG(ret, "Failed to enable LE Audio");
 

@@ -924,11 +924,13 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 	if (channel == AUDIO_CH_L) {
 		if (ring_buf_put(&ble_rx_l_ringbuf, (uint8_t *)&ble_rx_data, sizeof(ble_rx_data)) != sizeof(ble_rx_data)) {
 			LOG_WRN("Left channel ring buffer full");
+			ring_buf_reset(&ble_rx_l_ringbuf);
 			return;
 		}
 	} else if (channel == AUDIO_CH_R) {
 		if (ring_buf_put(&ble_rx_r_ringbuf, (uint8_t *)&ble_rx_data, sizeof(ble_rx_data)) != sizeof(ble_rx_data)) {
 			LOG_WRN("Right channel ring buffer full");
+			ring_buf_reset(&ble_rx_r_ringbuf);
 			return;
 		}
 	}
