@@ -280,9 +280,9 @@ static void stream_stopped_cb(struct bt_bap_stream *stream, uint8_t reason)
 	switch (reason) {
 	case BT_HCI_ERR_LOCALHOST_TERM_CONN:
 		LOG_INF("Stream stopped by user");
-		le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING);
+		//le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING);
 
-		break;
+		//break;
 
 	case BT_HCI_ERR_CONN_FAIL_TO_ESTAB:
 		/* Fall-through */

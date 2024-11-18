@@ -84,6 +84,7 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 	bt_data_parse(ad, scan_check_broadcast_source, (void *)&source);
 	if(source.high_pri_stream) {
 		if (source.id != current_broadcast_id) {
+			last_broadcast_id = current_broadcast_id;
 			LOG_ERR("should switch stream");
 			bt_le_scan_cb_unregister(&scan_callback);
 			bt_le_scan_stop();
@@ -322,6 +323,7 @@ static void le_audio_msg_sub_thread(void)
 			}
 
 			if (IS_ENABLED(CONFIG_BT_OBSERVER)) {
+				LOG_WRN("last_broadcast_id %X", last_broadcast_id);
 				ret = bt_mgmt_scan_start(0, 0, BT_MGMT_SCAN_TYPE_BROADCAST, NULL,
 							 last_broadcast_id);
 				if (ret) {
