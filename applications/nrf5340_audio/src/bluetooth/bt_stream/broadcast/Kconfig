@@ -97,6 +97,7 @@ endchoice
 
 config BT_AUDIO_BROADCAST_NAME
 	string "Broadcast name"
+	default "HIGH_PRI_BROADCASTER" if BT_AUDIO_HIGH_PRI_BROADCASTER
 	default "NRF5340_BROADCASTER"
 	# TODO: Add back 'depends on TRANSPORT_BIS' once applications are ready
 	help
