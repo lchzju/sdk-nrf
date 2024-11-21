@@ -58,10 +58,10 @@ static const uint8_t cap_adv_data[] = {
 
 static struct bt_cap_stream *cap_tx_streams[CONFIG_BT_ASCS_MAX_ASE_SRC_COUNT];
 
-#define AVAILABLE_SOURCE_CONTEXT BT_AUDIO_CONTEXT_TYPE_PROHIBITED
+#define AVAILABLE_SOURCE_CONTEXT BT_AUDIO_CONTEXT_TYPE_ANY
 
 static struct bt_bap_unicast_server_register_param unicast_server_params = {
-	CONFIG_BT_ASCS_MAX_ASE_SNK_COUNT, 0};
+	CONFIG_BT_ASCS_MAX_ASE_SNK_COUNT, CONFIG_BT_ASCS_MAX_ASE_SRC_COUNT};
 
 static uint8_t unicast_server_adv_data[] = {
 	BT_UUID_16_ENCODE(BT_UUID_ASCS_VAL),
@@ -93,10 +93,21 @@ static struct bt_audio_codec_cap lc3_codec_sink = BT_AUDIO_CODEC_CAP_LC3(
 	LE_AUDIO_SDU_SIZE_OCTETS(CONFIG_LC3_BITRATE_MAX), 1u, AVAILABLE_SINK_CONTEXT);
 #endif /* (CONFIG_BT_AUDIO_RX) */
 
+#if defined(CONFIG_BT_AUDIO_TX)
+static struct bt_audio_codec_cap lc3_codec_source = BT_AUDIO_CODEC_CAP_LC3(
+	BT_AUDIO_CODEC_CAPABILIY_FREQ,
+	(BT_AUDIO_CODEC_CAP_DURATION_10 | BT_AUDIO_CODEC_CAP_DURATION_PREFER_10),
+	BT_AUDIO_CODEC_CAP_CHAN_COUNT_SUPPORT(1), LE_AUDIO_SDU_SIZE_OCTETS(CONFIG_LC3_BITRATE_MIN),
+	LE_AUDIO_SDU_SIZE_OCTETS(CONFIG_LC3_BITRATE_MAX), 1u, AVAILABLE_SOURCE_CONTEXT);
+#endif /* (CONFIG_BT_AUDIO_TX) */
+
 static enum bt_audio_dir caps_dirs[] = {
 #if defined(CONFIG_BT_AUDIO_RX)
 	BT_AUDIO_DIR_SINK,
 #endif /* CONFIG_BT_AUDIO_RX */
+#if defined(CONFIG_BT_AUDIO_TX)
+	BT_AUDIO_DIR_SOURCE,
+#endif /* (CONFIG_BT_AUDIO_TX) */
 };
 
 static const struct bt_audio_codec_qos_pref qos_pref = BT_AUDIO_CODEC_QOS_PREF(
@@ -106,14 +117,20 @@ static const struct bt_audio_codec_qos_pref qos_pref = BT_AUDIO_CODEC_QOS_PREF(
 
 /* clang-format off */
 static struct bt_pacs_cap caps[] = {
+#if (CONFIG_BT_AUDIO_RX)
 				{
 					 .codec_cap = &lc3_codec_sink,
 				},
+#endif
+#if (CONFIG_BT_AUDIO_TX)
+				{
+					 .codec_cap = &lc3_codec_source,
+				}
+#endif /* (CONFIG_BT_AUDIO_TX) */
 };
-/* clang-format on */
 
 static struct bt_cap_stream
-	cap_audio_streams[CONFIG_BT_ASCS_MAX_ASE_SNK_COUNT];
+	cap_audio_streams[CONFIG_BT_ASCS_MAX_ASE_SNK_COUNT + CONFIG_BT_ASCS_MAX_ASE_SRC_COUNT];
 
 #if (CONFIG_BT_AUDIO_TX)
 BUILD_ASSERT(CONFIG_BT_ASCS_MAX_ASE_SRC_COUNT <= 1,
@@ -624,6 +641,15 @@ int unicast_server_enable(le_audio_receive_cb recv_cb, enum bt_audio_location lo
 	if (IS_ENABLED(CONFIG_BT_AUDIO_RX)) {
 
 		ret = bt_pacs_set_location(BT_AUDIO_DIR_SINK, location);
+		if (ret) {
+			LOG_ERR("Location set failed. Err: %d", ret);
+			return ret;
+		}
+	}
+
+	if (IS_ENABLED(CONFIG_BT_AUDIO_TX)) {
+		bt_le_audio_tx_init();
+		ret = bt_pacs_set_location(BT_AUDIO_DIR_SOURCE, BT_AUDIO_LOCATION_FRONT_LEFT);
 		if (ret) {
 			LOG_ERR("Location set failed. Err: %d", ret);
 			return ret;
