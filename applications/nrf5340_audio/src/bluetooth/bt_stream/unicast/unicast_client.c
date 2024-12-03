@@ -92,6 +92,12 @@ static le_audio_receive_cb receive_cb;
 static struct bt_bap_unicast_group *unicast_group;
 static bool unicast_group_created;
 
+#define BT_BAP_LC3_UNICAST_PRESET_STEREO_24_2_1(_loc, _stream_context)                                    \
+	BT_BAP_LC3_PRESET(BT_AUDIO_CODEC_LC3_CONFIG(BT_AUDIO_CODEC_CFG_FREQ_24KHZ,                 \
+						    BT_AUDIO_CODEC_CFG_DURATION_10, _loc, 60U, 1,  \
+						    _stream_context),                              \
+			  BT_AUDIO_CODEC_QOS_UNFRAMED(10000u, 120u, 2u, 10u, 40000u))
+
 static struct bt_bap_lc3_preset lc3_preset_sink = BT_BAP_LC3_UNICAST_PRESET_NRF5340_AUDIO_SINK;
 static struct bt_bap_lc3_preset lc3_preset_sink_48_4_1 = BT_BAP_LC3_UNICAST_PRESET_48_4_1(
 	BT_AUDIO_LOCATION_ANY, (BT_AUDIO_CONTEXT_TYPE_UNSPECIFIED));
@@ -104,7 +110,7 @@ static struct bt_bap_lc3_preset lc3_preset_source = BT_BAP_LC3_UNICAST_PRESET_NR
 static struct bt_bap_lc3_preset lc3_preset_source_48_4_1 =
 	BT_BAP_LC3_UNICAST_PRESET_48_4_1(BT_AUDIO_LOCATION_ANY, BT_AUDIO_CONTEXT_TYPE_UNSPECIFIED);
 static struct bt_bap_lc3_preset lc3_preset_source_24_2_1 =
-	BT_BAP_LC3_UNICAST_PRESET_24_2_1(BT_AUDIO_LOCATION_ANY, BT_AUDIO_CONTEXT_TYPE_UNSPECIFIED);
+	BT_BAP_LC3_UNICAST_PRESET_STEREO_24_2_1(BT_AUDIO_LOCATION_ANY, BT_AUDIO_CONTEXT_TYPE_UNSPECIFIED);
 static struct bt_bap_lc3_preset lc3_preset_source_16_2_1 =
 	BT_BAP_LC3_UNICAST_PRESET_16_2_1(BT_AUDIO_LOCATION_ANY, BT_AUDIO_CONTEXT_TYPE_UNSPECIFIED);
 
@@ -1017,7 +1023,7 @@ static void discover_cb(struct bt_conn *conn, int err, enum bt_audio_dir dir)
 					  temp_cap[temp_cap_index].num_caps, BT_AUDIO_DIR_SOURCE,
 					  idx.lvl3)) {
 			bt_audio_codec_allocation_set(&lc3_preset_source.codec_cfg,
-						      unicast_server->location);
+						      (BT_AUDIO_LOCATION_FRONT_RIGHT|BT_AUDIO_LOCATION_FRONT_LEFT));
 		} else {
 			LOG_WRN("No valid codec capability found for %s source",
 				unicast_server->ch_name);
@@ -1315,7 +1321,7 @@ static void stream_recv_cb(struct bt_bap_stream *stream, const struct bt_iso_rec
 	}
 
 	receive_cb(buf->data, buf->len, bad_frame, info->ts, idx.lvl3,
-		   bt_audio_codec_cfg_get_octets_per_frame(stream->codec_cfg));
+		   bt_audio_codec_cfg_get_octets_per_frame(stream->codec_cfg)*2);
 }
 #endif /* (CONFIG_BT_AUDIO_RX) */
 
