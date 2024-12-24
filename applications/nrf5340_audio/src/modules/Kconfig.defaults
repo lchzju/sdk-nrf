@@ -28,7 +28,7 @@ config USB_DEVICE_PID
 	default 0x530A
 
 config USB_DEVICE_PRODUCT
-	default "nRF5340 USB Audio"
+	default "nRF5340 USB Dongle"
 
 config USB_DEVICE_MANUFACTURER
 	default "Nordic Semiconductor AS"
