@@ -433,7 +433,7 @@ static void supported_sample_rates_print(uint16_t supported_sample_rates, enum b
 	}
 
 	if (supported_sample_rates & BT_AUDIO_CODEC_CAP_FREQ_16KHZ) {
-		strcat(supported_str, "16, ");
+		strcat(supported_str, "16 ");
 	}
 
 	if (dir == BT_AUDIO_DIR_SINK) {
@@ -684,7 +684,7 @@ static bool valid_codec_cap_check(struct bt_audio_codec_cap cap_array[], uint8_t
 		for (int i = 0; i < num_caps; i++) {
 			if (IS_ENABLED(CONFIG_BT_AUDIO_EP_PRINT)) {
 				LOG_INF("");
-				LOG_INF("Dev: %d Sink EP %d", index, i);
+				LOG_INF("Dev: %d, Sink EP: %d", index, i);
 				(void)bt_audio_data_parse(cap_array[i].data, cap_array[i].data_len,
 							  caps_print_cb, NULL);
 				LOG_INF("__________________________");
@@ -698,7 +698,7 @@ static bool valid_codec_cap_check(struct bt_audio_codec_cap cap_array[], uint8_t
 		for (int i = 0; i < num_caps; i++) {
 			if (IS_ENABLED(CONFIG_BT_AUDIO_EP_PRINT)) {
 				LOG_INF("");
-				LOG_INF("Dev: %d Source EP %d", index, i);
+				LOG_INF("Dev: %d, Source EP: %d", index, i);
 				(void)bt_audio_data_parse(cap_array[i].data, cap_array[i].data_len,
 							  caps_print_cb, NULL);
 				LOG_INF("__________________________");
@@ -843,7 +843,7 @@ static void available_contexts_cb(struct bt_conn *conn, enum bt_audio_context sn
 
 	(void)bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
-	LOG_DBG("conn: %s, snk ctx %d src ctx %d", addr, snk_ctx, src_ctx);
+	LOG_DBG("conn: %s, snk ctx 0x%x, src ctx 0x%x", addr, snk_ctx, src_ctx);
 }
 
 static int temp_cap_index_get(struct bt_conn *conn, uint8_t *index)
@@ -1142,10 +1142,10 @@ static void stream_configured_cb(struct bt_bap_stream *stream,
 
 	if (dir == BT_AUDIO_DIR_SINK) {
 		/* NOTE: The string below is used by the Nordic CI system */
-		LOG_INF("%s sink stream configured", unicast_server->ch_name);
+		LOG_INF("*%s* sink stream configured", unicast_server->ch_name);
 		le_audio_print_codec(unicast_server->cap_sink_stream.bap_stream.codec_cfg, dir);
 	} else if (dir == BT_AUDIO_DIR_SOURCE) {
-		LOG_INF("%s source stream configured", unicast_server->ch_name);
+		LOG_INF("*%s* source stream configured", unicast_server->ch_name);
 		le_audio_print_codec(unicast_server->cap_source_stream.bap_stream.codec_cfg, dir);
 	} else {
 		LOG_ERR("Endpoint direction not recognized: %d", dir);

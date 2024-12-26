@@ -72,9 +72,20 @@ const uint32_t pdm_mic_enable_configure[][2] = {
 	/* Volume Update */
 	{ CS47L63_INPUT_CONTROL3, 0x20000000 },
 
-	/* Send PDM MIC to I2S Tx */
-	{ CS47L63_ASP1TX1_INPUT1, 0x800010 },
-	{ CS47L63_ASP1TX2_INPUT1, 0x800011 },
+#if 1
+	/* Route PDM MIC to I2S Tx */
+	{ CS47L63_ASP1TX1_INPUT1, 0x800010 }, //reg addr 0x8200, ASP1TX1_SRC1 [8:0] = 0x10 = IN1L
+	{ CS47L63_ASP1TX2_INPUT1, 0x800011 }, //reg addr 0x8210,ASP1TX2_SRC1 [8:0] = 0x11 = IN1R
+
+#else
+	/* With only one microphone, the audio data typically appears only on one of the I2S channels (usually the left channel).
+	 * The right channel might contain invalid data or zeroes unless specifically configured otherwise.
+	 * The microphone data is sent to the left channel of the I2S bus, and the right channel might be muted or contain no valid data. 
+	 * You can configure the codec to duplicate the mono microphone data to both I2S channels for compatibility with stereo processing.
+	 */
+	{ CS47L63_ASP1TX1_INPUT1, 0x800010 },  // Route PDM MIC to ASP1TX1 (left channel)
+	{ CS47L63_ASP1TX2_INPUT1, 0x800010 },  // Optionally, duplicate the same PDM MIC to ASP1TX2 (right channel)
+#endif
 };
 
 /* Set up input */
@@ -96,16 +107,16 @@ const uint32_t line_in_enable[][2] = {
 	/* Volume Update */
 	{ CS47L63_INPUT_CONTROL3, 0x20000000 },
 
-	/* Route IN2L and IN2R to I2S */
-	{ CS47L63_ASP1TX1_INPUT1, 0x800012 },
-	{ CS47L63_ASP1TX2_INPUT1, 0x800013 },
+	/* Route IN2L and IN2R to I2S Tx */
+	{ CS47L63_ASP1TX1_INPUT1, 0x800012 }, // reg addr 0x8200, ASP1TX1_SRC1 [8:0] = 0x012 = IN2L signal path
+	{ CS47L63_ASP1TX2_INPUT1, 0x800013 }, // reg addr 0x8210,ASP1TX2_SRC1 [8:0] = 0x013 = IN2R signal path
 };
 
 /* Set up output */
 const uint32_t output_enable[][2] = {
 	{ CS47L63_OUTPUT_ENABLE_1, 0x0002 },
-	{ CS47L63_OUT1L_INPUT1, 0x800020 },
-	{ CS47L63_OUT1L_INPUT2, 0x800021 },
+	{ CS47L63_OUT1L_INPUT1, 0x800020 }, // reg addr 0x8100, OUT1L_SRC1 [8:0] x_SRCn = 0x020 = ASP1 RX1
+	{ CS47L63_OUT1L_INPUT2, 0x800021 }, // reg addr 0x8104, OUT1L_SRC2 [8:0] x_SRCn = 0x021 = ASP1 RX2
 };
 
 const uint32_t output_disable[][2] = {
@@ -135,11 +146,11 @@ const uint32_t asp1_enable[][2] = {
 	{ CS47L63_SAMPLE_RATE4, 0 },
 
 	/* Set ASP1 in slave mode and 16 bit per channel */
-	{ CS47L63_ASP1_CONTROL2, 0x10100200 },
-	{ CS47L63_ASP1_CONTROL3, 0x0000 },
-	{ CS47L63_ASP1_DATA_CONTROL1, 0x0020 },
-	{ CS47L63_ASP1_DATA_CONTROL5, 0x0020 },
-	{ CS47L63_ASP1_ENABLES1, 0x30003 },
+	{ CS47L63_ASP1_CONTROL2, 0x10100200 },  //reg addr 0x6008, ASP1_FMT[2:0] = 010, I2S Mode, slave
+	{ CS47L63_ASP1_CONTROL3, 0x0000 },      //reg addr 0x600C, ASP1_DOUT_HIZ_CTRL[1:0] = 00， Logic 0 during unused time slots, Logic 0 if all transmit channels are disabled
+	{ CS47L63_ASP1_DATA_CONTROL1, 0x0020 }, //reg addr 0x6030, ASP1_DATA_CONTROL1：ASP1_TX_WL[5:0]=32， ASP1 TX Data Width (Number of valid data bits per slot)
+	{ CS47L63_ASP1_DATA_CONTROL5, 0x0020 }, //reg addr 0x6040, ASP1_DATA_CONTROL5：ASP1_RX_WL[5:0]=32， ASP1 RX Data Width (Number of valid data bits per slot)
+	{ CS47L63_ASP1_ENABLES1, 0x30003 },     //reg addr 0x6000, ASP1_ENABLES1: ASP1_TX1_EN=1, ASP1_TX2_EN=1, ASP1_RX1_EN=1, ASP1_RX2_EN=1
 };
 
 const uint32_t FLL_toggle[][2] = {

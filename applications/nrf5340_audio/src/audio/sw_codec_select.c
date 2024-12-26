@@ -119,6 +119,9 @@ int sw_codec_encode(void *pcm_data, size_t pcm_size, uint8_t **encoded_data, siz
 			return ret;
 		}
 
+		//LOG_HEXDUMP_INF(pcm_data_mono_system_sample_rate[AUDIO_CH_L], 96, "Left");
+		//LOG_HEXDUMP_INF(pcm_data_mono_system_sample_rate[AUDIO_CH_R], 96, "Right");
+
 		for (int i = 0; i < m_config.encoder.channel_mode; ++i) {
 			ret = sw_codec_sample_rate_convert(
 				&encoder_converters[i], CONFIG_AUDIO_SAMPLE_RATE_HZ,
@@ -387,7 +390,7 @@ int sw_codec_init(struct sw_codec_config sw_codec_cfg)
 			}
 			uint16_t pcm_bytes_req_enc;
 
-			LOG_DBG("Encode: %dHz %dbits %dus %dbps %d channel(s)",
+			LOG_DBG("Encode: %dHz, %dbits, %dus, %dbps, %d channel(s)",
 				sw_codec_cfg.encoder.sample_rate_hz, CONFIG_AUDIO_BIT_DEPTH_BITS,
 				CONFIG_AUDIO_FRAME_DURATION_US, sw_codec_cfg.encoder.bitrate,
 				sw_codec_cfg.encoder.num_ch);
@@ -408,7 +411,7 @@ int sw_codec_init(struct sw_codec_config sw_codec_cfg)
 				return -EALREADY;
 			}
 
-			LOG_DBG("Decode: %dHz %dbits %dus %d channel(s)",
+			LOG_DBG("Decode: %dHz, %dbits, %dus, %d channel(s)",
 				sw_codec_cfg.decoder.sample_rate_hz, CONFIG_AUDIO_BIT_DEPTH_BITS,
 				CONFIG_AUDIO_FRAME_DURATION_US, sw_codec_cfg.decoder.num_ch);
 
