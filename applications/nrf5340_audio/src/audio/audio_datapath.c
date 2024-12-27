@@ -57,12 +57,12 @@ LOG_MODULE_REGISTER(audio_datapath, CONFIG_AUDIO_DATAPATH_LOG_LEVEL);
 /* Decrement sample FIFO index by one block */
 #define PREV_IDX(i) (((i) > 0) ? ((i)-1) : (FIFO_NUM_BLKS - 1))
 
-#define NUM_BLKS_IN_FRAME      NUM_BLKS(CONFIG_AUDIO_FRAME_DURATION_US)
-#define BLK_MONO_NUM_SAMPS     BLK_SIZE_SAMPLES(CONFIG_AUDIO_SAMPLE_RATE_HZ)
-#define BLK_STEREO_NUM_SAMPS   (BLK_MONO_NUM_SAMPS * 2)
+#define NUM_BLKS_IN_FRAME      NUM_BLKS(CONFIG_AUDIO_FRAME_DURATION_US) //10
+#define BLK_MONO_NUM_SAMPS     BLK_SIZE_SAMPLES(CONFIG_AUDIO_SAMPLE_RATE_HZ) //48
+#define BLK_STEREO_NUM_SAMPS   (BLK_MONO_NUM_SAMPS * 2) //96
 /* Number of octets in a single audio block */
-#define BLK_MONO_SIZE_OCTETS   (BLK_MONO_NUM_SAMPS * CONFIG_AUDIO_BIT_DEPTH_OCTETS)
-#define BLK_STEREO_SIZE_OCTETS (BLK_MONO_SIZE_OCTETS * 2)
+#define BLK_MONO_SIZE_OCTETS   (BLK_MONO_NUM_SAMPS * CONFIG_AUDIO_BIT_DEPTH_OCTETS) //48*2=96
+#define BLK_STEREO_SIZE_OCTETS (BLK_MONO_SIZE_OCTETS * 2) //192
 /* How many function calls before moving on with drift compensation */
 #define DRIFT_COMP_WAITING_CNT (DRIFT_MEAS_PERIOD_US / BLK_PERIOD_US)
 /* How much data to be collected before moving on with presentation compensation */
@@ -88,7 +88,7 @@ LOG_MODULE_REGISTER(audio_datapath, CONFIG_AUDIO_DATAPATH_LOG_LEVEL);
 #define JUST_IN_TIME_BOUND_US	   2500
 
 /* How often to print under-run warning */
-#define UNDERRUN_LOG_INTERVAL_BLKS 5000
+#define UNDERRUN_LOG_INTERVAL_BLKS 10000
 
 enum drift_comp_state {
 	DRIFT_STATE_INIT,   /* Waiting for data to be received */
@@ -666,8 +666,8 @@ static void audio_datapath_i2s_blk_complete(uint32_t frame_start_ts_us, uint32_t
 
 					if ((ctrl_blk.out.total_blk_underruns %
 					     UNDERRUN_LOG_INTERVAL_BLKS) == 0) {
-						LOG_WRN("In I2S TX under-run condition, total: %d",
-							ctrl_blk.out.total_blk_underruns);
+						//LOG_WRN("In I2S TX under-run condition, total: %d",
+							//ctrl_blk.out.total_blk_underruns);
 					}
 				}
 
@@ -898,13 +898,19 @@ void audio_datapath_pres_delay_us_get(uint32_t *delay_us)
 	*delay_us = ctrl_blk.pres_comp.pres_delay_us;
 }
 
+#define DATA_SIZE_IN_BYTES_PER_CHANNEL  (60)
+
 void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref_us, bool bad_frame,
-			       uint32_t recv_frame_ts_us)
+			       uint32_t recv_frame_ts_us, uint8_t channel)
 {
+	static uint8_t prev_channel = 0;
+	static uint8_t stereo_encoded_data[DATA_SIZE_IN_BYTES_PER_CHANNEL * 2] = {0};
+
 	if (!ctrl_blk.stream_started) {
 		LOG_WRN("Stream not started");
 		return;
 	}
+	//size = DATA_SIZE_IN_BYTES_PER_CHANNEL;
 
 	/*** Check incoming data ***/
 
@@ -912,9 +918,94 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 		LOG_ERR("Buffer pointer is NULL");
 	}
 
-	if (sdu_ref_us == ctrl_blk.prev_pres_sdu_ref_us && sdu_ref_us != 0) {
-		LOG_WRN("Duplicate sdu_ref_us (%d) - Dropping audio frame", sdu_ref_us);
-		return;
+	LOG_DBG("%u bytes from channel[%d] to be decoded", size, channel);
+	
+	if ( 2 == audio_system_decoder_num_ch_get() )
+	{
+		if (bad_frame) 
+		{
+			/* Error in the frame or frame lost - sdu_ref_us is still valid */
+			LOG_DBG("Bad audio frame");
+			if (channel == 0) 
+			{
+				bad_frame |= 0x01;
+			} 
+			else 
+			{
+				bad_frame |= 0x02;
+			}
+		} 
+		else 
+		{
+			bad_frame = 0;
+		}
+
+		uint32_t delta_us = abs(sdu_ref_us - ctrl_blk.prev_pres_sdu_ref_us) ;
+
+		LOG_DBG("delta_us: %u", delta_us);
+
+		if (delta_us < 500) 
+		{
+			LOG_DBG("delta_us is small enough");
+
+			//return;
+			if (channel == prev_channel) 
+			{
+				LOG_WRN("Duplicate sdu_ref_us (%d) - Dropping audio frame from %d", sdu_ref_us, channel);
+				return;
+			} 
+			else 
+			{
+				LOG_DBG("On a different channel");
+				if (channel == 0) 
+				{
+					memcpy(stereo_encoded_data, buf, size);
+				} 
+				else 
+				{
+					memcpy(stereo_encoded_data + size, buf, size);
+				}
+				prev_channel = channel;
+			}
+		} 
+		else 
+		{
+			LOG_DBG("delta_us is big enough");
+			if (channel == prev_channel) 
+			{
+				LOG_DBG("On the previous channel");
+				if (channel == 0) 
+				{
+					memcpy(stereo_encoded_data, buf, size);
+					//memset(stereo_encoded_data + size, 0, size);
+				} 
+				else
+				{
+					memcpy(stereo_encoded_data + size, buf, size);
+					//memset(stereo_encoded_data, 0, size);
+				}
+			} 
+			else 
+			{
+				//a new packet
+				LOG_DBG("A new packet on a different channel");
+				if (channel == 0) 
+				{
+					memcpy(stereo_encoded_data, buf, size);
+				} 
+				else 
+				{
+					memcpy(stereo_encoded_data + size, buf, size);
+				}
+				prev_channel = channel;
+				if (prev_channel == 0) 
+				{
+					ctrl_blk.prev_pres_sdu_ref_us = sdu_ref_us;
+				}
+
+				return;
+			}		
+		}
 	}
 
 	bool sdu_ref_not_consecutive = false;
@@ -924,12 +1015,12 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 
 		/* Check if the delta is from two consecutive frames */
 		if (sdu_ref_delta_us <
-		    (CONFIG_AUDIO_FRAME_DURATION_US + (CONFIG_AUDIO_FRAME_DURATION_US / 2))) {
+		    (CONFIG_AUDIO_FRAME_DURATION_US + (CONFIG_AUDIO_FRAME_DURATION_US / 2))) { // sdu_ref_delta_us < 1500
 			/* Check for invalid delta */
 			if ((sdu_ref_delta_us >
-			     (CONFIG_AUDIO_FRAME_DURATION_US + SDU_REF_DELTA_MAX_ERR_US)) ||
+			     (CONFIG_AUDIO_FRAME_DURATION_US + SDU_REF_DELTA_MAX_ERR_US)) || // sdu_ref_delta_us > 1010
 			    (sdu_ref_delta_us <
-			     (CONFIG_AUDIO_FRAME_DURATION_US - SDU_REF_DELTA_MAX_ERR_US))) {
+			     (CONFIG_AUDIO_FRAME_DURATION_US - SDU_REF_DELTA_MAX_ERR_US))) { // sdu_ref_delta_us < 990
 				LOG_DBG("Invalid sdu_ref_us delta (%d) - Estimating sdu_ref_us",
 					sdu_ref_delta_us);
 
@@ -937,7 +1028,7 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 				sdu_ref_us = ctrl_blk.prev_pres_sdu_ref_us +
 					     CONFIG_AUDIO_FRAME_DURATION_US;
 			}
-		} else {
+		} else {  // sdu_ref_delta_us >= 1500
 			LOG_INF("sdu_ref_us not from consecutive frames (diff: %d us)",
 				sdu_ref_delta_us);
 			sdu_ref_not_consecutive = true;
@@ -957,9 +1048,22 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 	int ret;
 	size_t pcm_size;
 
-	ret = sw_codec_decode(buf, size, bad_frame, &ctrl_blk.decoded_data, &pcm_size);
+	if ( 2 == audio_system_decoder_num_ch_get() )
+	{
+		ret = sw_codec_decode(stereo_encoded_data, size * 2, bad_frame, &ctrl_blk.decoded_data, &pcm_size);
+	}
+	else
+	{
+		ret = sw_codec_decode(stereo_encoded_data, size, bad_frame, &ctrl_blk.decoded_data, &pcm_size);
+	}
+
 	if (ret) {
 		LOG_WRN("SW codec decode error: %d", ret);
+		LOG_WRN("bad_frame = %d, size = %d, pcm_size = %d", bad_frame, size, pcm_size);
+	}
+	else
+	{
+		LOG_DBG("sw_codec_decode succeeded, pcm_size = %d", pcm_size);
 	}
 
 	if (IS_ENABLED(CONFIG_SD_CARD_PLAYBACK)) {
@@ -973,6 +1077,11 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 			(BLK_STEREO_SIZE_OCTETS * NUM_BLKS_IN_FRAME));
 		/* Discard frame */
 		return;
+	}
+
+	if ( 2 == audio_system_decoder_num_ch_get() )
+	{
+		memset(stereo_encoded_data, 0, sizeof(stereo_encoded_data));
 	}
 
 	/*** Add audio data to FIFO buffer ***/

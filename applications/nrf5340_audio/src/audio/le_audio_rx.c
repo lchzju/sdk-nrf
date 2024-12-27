@@ -14,7 +14,7 @@
 #include "audio_sync_timer.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(le_audio_rx, CONFIG_LE_AUDIO_RX_LOG_LEVEL);
+LOG_MODULE_REGISTER(le_audio_rx, 4);
 
 struct ble_iso_data {
 	uint8_t data[CONFIG_BT_ISO_RX_MTU];
@@ -22,6 +22,7 @@ struct ble_iso_data {
 	bool bad_frame;
 	uint32_t sdu_ref;
 	uint32_t recv_frame_ts;
+	uint8_t channel;
 } __packed;
 
 struct rx_stats {
@@ -62,7 +63,7 @@ void le_audio_rx_data_handler(uint8_t const *const p_data, size_t data_size, boo
 		/* A valid frame should always be equal to desired_data_size, set bad_frame
 		 * if that is not the case
 		 */
-		LOG_DBG("data size %d, desired size %d", data_size, desired_data_size);
+		LOG_DBG("Bad frame: data size %d, desired size %d", data_size, desired_data_size);
 		bad_frame = true;
 		rx_stats[channel_index].data_size_mismatch_cnt++;
 	}
@@ -73,9 +74,9 @@ void le_audio_rx_data_handler(uint8_t const *const p_data, size_t data_size, boo
 
 	if ((rx_stats[channel_index].recv_cnt % 100) == 0 && rx_stats[channel_index].recv_cnt) {
 		/* NOTE: The string below is used by the Nordic CI system */
-		LOG_INF("ISO RX SDUs: Ch: %d Total: %d Bad: %d Size mismatch %d", channel_index,
+		LOG_INF("ISO RX SDUs: Ch: %d, Total: %d, Bad: %d, Size mismatch %d, data size = %d", channel_index,
 			rx_stats[channel_index].recv_cnt, rx_stats[channel_index].bad_frame_cnt,
-			rx_stats[channel_index].data_size_mismatch_cnt);
+			rx_stats[channel_index].data_size_mismatch_cnt, data_size);
 	}
 
 	if (stream_state_get() != STATE_STREAMING) {
@@ -88,10 +89,12 @@ void le_audio_rx_data_handler(uint8_t const *const p_data, size_t data_size, boo
 		return;
 	}
 
+#if 0
 	if (channel_index != AUDIO_CH_L && (CONFIG_AUDIO_DEV == GATEWAY)) {
 		/* Only left channel RX data in use on gateway */
 		return;
 	}
+#endif
 
 	ret = data_fifo_num_used_get(&ble_fifo_rx, &blocks_alloced_num, &blocks_locked_num);
 	ERR_CHK(ret);
@@ -128,6 +131,7 @@ void le_audio_rx_data_handler(uint8_t const *const p_data, size_t data_size, boo
 	iso_received->data_size = data_size;
 	iso_received->sdu_ref = sdu_ref;
 	iso_received->recv_frame_ts = recv_frame_ts;
+	iso_received->channel = channel_index;
 
 	ret = data_fifo_block_lock(&ble_fifo_rx, (void *)&iso_received,
 				   sizeof(struct ble_iso_data));
@@ -148,6 +152,8 @@ static void audio_datapath_thread(void *dummy1, void *dummy2, void *dummy3)
 							&iso_received_size, K_FOREVER);
 		ERR_CHK(ret);
 
+		LOG_DBG("iso received data size: %d", iso_received->data_size);
+
 		if (IS_ENABLED(CONFIG_AUDIO_SOURCE_USB) && (CONFIG_AUDIO_DEV == GATEWAY)) {
 			ret = audio_system_decode(iso_received->data, iso_received->data_size,
 						  iso_received->bad_frame);
@@ -155,7 +161,7 @@ static void audio_datapath_thread(void *dummy1, void *dummy2, void *dummy3)
 		} else {
 			audio_datapath_stream_out(iso_received->data, iso_received->data_size,
 						  iso_received->sdu_ref, iso_received->bad_frame,
-						  iso_received->recv_frame_ts);
+					  	  iso_received->recv_frame_ts, iso_received->channel);
 		}
 		data_fifo_block_free(&ble_fifo_rx, (void *)iso_received);
 

@@ -813,6 +813,8 @@ static void unicast_client_location_cb(struct bt_conn *conn, enum bt_audio_dir d
 	int ret;
 	struct stream_index idx;
 
+	LOG_DBG("Remote Unicast Server Audio Locations"); 
+
 	ret = device_index_get(conn, &idx);
 	if (ret) {
 		LOG_ERR("Device index not found");
@@ -826,12 +828,14 @@ static void unicast_client_location_cb(struct bt_conn *conn, enum bt_audio_dir d
 	    (loc == BT_AUDIO_LOCATION_MONO_AUDIO)) {
 		unicast_server->location = BT_AUDIO_LOCATION_FRONT_LEFT;
 		unicast_server->ch_name = "LEFT";
+		LOG_DBG("LEFT location is found. loc = 0x%x", loc);
 
 	} else if ((loc & BT_AUDIO_LOCATION_FRONT_RIGHT) || (loc & BT_AUDIO_LOCATION_SIDE_RIGHT)) {
 		unicast_server->location = BT_AUDIO_LOCATION_FRONT_RIGHT;
 		unicast_server->ch_name = "RIGHT";
+		LOG_DBG("RIGHT location is found. loc = 0x%x", loc);
 	} else {
-		LOG_WRN("Channel location not supported: %d", loc);
+		LOG_WRN("Channel location not supported: loc = 0x%x", loc);
 		le_audio_event_publish(LE_AUDIO_EVT_NO_VALID_CFG, conn, dir);
 	}
 }
@@ -840,6 +844,8 @@ static void available_contexts_cb(struct bt_conn *conn, enum bt_audio_context sn
 				  enum bt_audio_context src_ctx)
 {
 	char addr[BT_ADDR_LE_STR_LEN];
+
+	LOG_DBG("Remote Unicast Server Available Contexts"); 
 
 	(void)bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
@@ -880,6 +886,8 @@ static void pac_record_cb(struct bt_conn *conn, enum bt_audio_dir dir,
 	int ret;
 	uint8_t temp_cap_index;
 
+	LOG_DBG("Remote Published Audio Capability (PAC) record discovered"); 
+
 	ret = temp_cap_index_get(conn, &temp_cap_index);
 	if (ret) {
 		LOG_ERR("Could not get temporary CAP storage index");
@@ -909,6 +917,8 @@ static void endpoint_cb(struct bt_conn *conn, enum bt_audio_dir dir, struct bt_b
 	int ret;
 	struct stream_index idx;
 
+	LOG_DBG("Remote Audio Stream Endpoint (ASE) discovered");
+ 
 	ret = device_index_get(conn, &idx);
 	if (ret) {
 		LOG_ERR("Unknown connection, should not reach here");
@@ -920,6 +930,7 @@ static void endpoint_cb(struct bt_conn *conn, enum bt_audio_dir dir, struct bt_b
 
 	if (dir == BT_AUDIO_DIR_SINK) {
 		if (ep != NULL) {
+			LOG_DBG("Discovered sink endpoint");
 			if (unicast_server->num_sink_eps > 0) {
 				LOG_WRN("More than one sink endpoint found, idx 0 is used "
 					"by default");
@@ -938,6 +949,7 @@ static void endpoint_cb(struct bt_conn *conn, enum bt_audio_dir dir, struct bt_b
 		return;
 	} else if (dir == BT_AUDIO_DIR_SOURCE) {
 		if (ep != NULL) {
+			LOG_DBG("Discovered source endpoint");
 			if (unicast_server->num_source_eps > 0) {
 				LOG_WRN("More than one source endpoint found, idx 0 is "
 					"used by default");
@@ -965,6 +977,8 @@ static void discover_cb(struct bt_conn *conn, int err, enum bt_audio_dir dir)
 	uint8_t temp_cap_index;
 
 	struct stream_index idx;
+
+	LOG_DBG("BAP discovery callback function"); 
 
 	ret = device_index_get(conn, &idx);
 	if (ret) {
@@ -1023,7 +1037,7 @@ static void discover_cb(struct bt_conn *conn, int err, enum bt_audio_dir dir)
 					  temp_cap[temp_cap_index].num_caps, BT_AUDIO_DIR_SOURCE,
 					  idx.lvl3)) {
 			bt_audio_codec_allocation_set(&lc3_preset_source.codec_cfg,
-						      (BT_AUDIO_LOCATION_FRONT_RIGHT|BT_AUDIO_LOCATION_FRONT_LEFT));
+						      	unicast_server->location);
 		} else {
 			LOG_WRN("No valid codec capability found for %s source",
 				unicast_server->ch_name);
@@ -1273,7 +1287,8 @@ static void stream_stopped_cb(struct bt_bap_stream *stream, uint8_t reason)
 		}
 	}
 
-	le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING, stream->conn, BT_AUDIO_DIR_SINK);
+	//le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING, stream->conn, BT_AUDIO_DIR_SINK);
+	le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING, stream->conn, BT_AUDIO_DIR_SOURCE); //stop rx
 }
 
 static void stream_released_cb(struct bt_bap_stream *stream)
@@ -1294,7 +1309,8 @@ static void stream_released_cb(struct bt_bap_stream *stream)
 		}
 	}
 
-	le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING, stream->conn, BT_AUDIO_DIR_SINK);
+	//le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING, stream->conn, BT_AUDIO_DIR_SINK);
+	le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING, stream->conn, BT_AUDIO_DIR_SOURCE); //stop rx
 }
 
 #if (CONFIG_BT_AUDIO_RX)
@@ -1321,7 +1337,7 @@ static void stream_recv_cb(struct bt_bap_stream *stream, const struct bt_iso_rec
 	}
 
 	receive_cb(buf->data, buf->len, bad_frame, info->ts, idx.lvl3,
-		   bt_audio_codec_cfg_get_octets_per_frame(stream->codec_cfg)*2);
+		   bt_audio_codec_cfg_get_octets_per_frame(stream->codec_cfg));
 }
 #endif /* (CONFIG_BT_AUDIO_RX) */
 

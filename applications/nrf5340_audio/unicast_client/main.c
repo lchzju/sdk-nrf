@@ -247,7 +247,11 @@ static void le_audio_msg_sub_thread(void)
 			}
 
 			if (msg.dir == BT_AUDIO_DIR_SINK) {
+				LOG_DBG("LE_AUDIO_EVT_NOT_STREAMING: DIR_SINK: TX");
 				audio_system_encoder_stop();
+			}
+			else if (msg.dir == BT_AUDIO_DIR_SOURCE) {
+				LOG_DBG("LE_AUDIO_EVT_NOT_STREAMING: DIR_SOURCE: RX");
 			}
 
 			stream_state_set(STATE_PAUSED);
@@ -398,8 +402,10 @@ static void bt_mgmt_evt_handler(const struct zbus_channel *chan)
 		}
 
 		if (IS_ENABLED(CONFIG_STREAM_BIDIRECTIONAL)) {
+			LOG_INF("Start to discover SOURCE");
 			ret = unicast_client_discover(msg->conn, UNICAST_SERVER_SOURCE);
 		} else {
+			LOG_INF("Start to discover SINK");
 			ret = unicast_client_discover(msg->conn, UNICAST_SERVER_SINK);
 		}
 

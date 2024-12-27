@@ -187,7 +187,34 @@ int sw_codec_encode(void *pcm_data, size_t pcm_size, uint8_t **encoded_data, siz
 	return 0;
 }
 
-int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, bool bad_frame,
+#if 0
+static void hard_limiter(int32_t *const pcm)
+{
+	if (*pcm < INT16_MIN) {
+		LOG_DBG("Clip");
+		*pcm = INT16_MIN;
+	} else if (*pcm > INT16_MAX) {
+		LOG_DBG("Clip");
+		*pcm = INT16_MAX;
+	}
+}
+
+static void pcm_mix_identical(void *const pcm_a, size_t size_a, void const *const pcm_b,
+			      size_t size_b)
+{
+	int32_t res;
+
+	for (uint32_t i = 0; i < size_b / 2; i++) {
+		res = ((int16_t *)pcm_a)[i] + ((int16_t *)pcm_b)[i];
+
+		hard_limiter(&res);
+
+		((int16_t *)pcm_a)[i] = (int16_t)res;
+	}
+}
+#endif
+
+int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, uint8_t bad_frame,
 		    void **decoded_data, size_t *decoded_size)
 {
 	if (!m_config.decoder.enabled) {
@@ -224,6 +251,10 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, bool
 				if (ret) {
 					return ret;
 				}
+				else
+				{
+					LOG_DBG("LC3 decoded_data_size: %d for mono", decoded_data_size);
+				}
 
 				ret = sw_codec_sample_rate_convert(
 					&decoder_converters[AUDIO_CH_L],
@@ -235,6 +266,10 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, bool
 				if (ret) {
 					LOG_ERR("Sample rate conversion failed for mono: %d", ret);
 					return ret;
+				}
+				else
+				{
+					LOG_DBG("sample_rate_convert outputs pcm_size:%d for mono", decoded_data_size);
 				}
 			}
 
@@ -260,9 +295,13 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, bool
 				ret = sw_codec_lc3_dec_run(
 					encoded_data, encoded_size / 2, LC3_PCM_NUM_BYTES_MONO,
 					AUDIO_CH_L, decoded_data_mono[AUDIO_CH_L],
-					(uint16_t *)&decoded_data_size, bad_frame);
+					(uint16_t *)&decoded_data_size, bad_frame & 0x01);
 				if (ret) {
 					return ret;
+				}
+				else
+				{
+					LOG_DBG("LC3 decoded_data_size: %d on left channel", decoded_data_size);
 				}
 
 				/* Decode right channel */
@@ -270,9 +309,13 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, bool
 					(encoded_data + (encoded_size / 2)), encoded_size / 2,
 					LC3_PCM_NUM_BYTES_MONO, AUDIO_CH_R,
 					decoded_data_mono[AUDIO_CH_R],
-					(uint16_t *)&decoded_data_size, bad_frame);
+					(uint16_t *)&decoded_data_size, bad_frame & 0x02);
 				if (ret) {
 					return ret;
+				}
+				else
+				{
+					LOG_DBG("LC3 decoded_data_size: %d on right channel", decoded_data_size);
 				}
 
 				for (int i = 0; i < m_config.decoder.channel_mode; ++i) {
@@ -289,13 +332,31 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, bool
 							i, ret);
 						return ret;
 					}
+					else
+					{
+						LOG_DBG("sample_rate_convert outputs pcm_size:%d for channel:%d", pcm_size_mono, i);
+					}
 				}
 			}
 
+#if 0
+         // NOTE: code below is from Rick's dual-mic branch, it is intended to Mix left and right for output the same contents between channels
+			// Add right channel data to left channel. Question: is this needed?
+			pcm_mix_identical(pcm_in_data_ptrs[AUDIO_CH_L], LC3_PCM_NUM_BYTES_MONO, pcm_in_data_ptrs[AUDIO_CH_R], LC3_PCM_NUM_BYTES_MONO);
+
+			// Copy left channel data to right channel, so that left and right channels are the same
+			ret = pscm_copy_pad(pcm_in_data_ptrs[AUDIO_CH_L], PCM_NUM_BYTES_MONO,
+						CONFIG_AUDIO_BIT_DEPTH_BITS, pcm_data_stereo,
+						&pcm_size_stereo);
+#else
+		   // NOTE: code below is from the original Nordic NCS code
 			ret = pscm_combine(pcm_in_data_ptrs[AUDIO_CH_L],
 					   pcm_in_data_ptrs[AUDIO_CH_R], pcm_size_mono,
 					   CONFIG_AUDIO_BIT_DEPTH_BITS, pcm_data_stereo,
 					   &pcm_size_stereo);
+
+#endif
+
 			if (ret) {
 				return ret;
 			}

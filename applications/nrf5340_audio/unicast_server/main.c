@@ -88,38 +88,44 @@ static void button_msg_sub_thread(void)
 				break;
 			}
 
-			if (bt_content_ctlr_media_state_playing()) {
-				ret = bt_content_ctrl_stop(NULL);
-				if (ret) {
-					LOG_WRN("Could not stop: %d", ret);
-				}
+			if (IS_ENABLED(CONFIG_BT_MCC))
+			{
+				if (bt_content_ctlr_media_state_playing()) {
+					ret = bt_content_ctrl_stop(NULL);
+					if (ret) {
+						LOG_WRN("Could not stop: %d", ret);
+					}
 
-			} else if (!bt_content_ctlr_media_state_playing()) {
-				ret = bt_content_ctrl_start(NULL);
-				if (ret) {
-					LOG_WRN("Could not start: %d", ret);
-				}
+				} else if (!bt_content_ctlr_media_state_playing()) {
+					ret = bt_content_ctrl_start(NULL);
+					if (ret) {
+						LOG_WRN("Could not start: %d", ret);
+					}
 
-			} else {
-				LOG_WRN("In invalid state: %d", strm_state);
+				} else {
+					LOG_WRN("In invalid state: %d", strm_state);
+				}
 			}
-
 			break;
 
 		case BUTTON_VOLUME_UP:
-			ret = bt_r_and_c_volume_up();
-			if (ret) {
-				LOG_WRN("Failed to increase volume: %d", ret);
+			if (IS_ENABLED(CONFIG_BT_MCC))
+			{
+				ret = bt_r_and_c_volume_up();
+				if (ret) {
+					LOG_WRN("Failed to increase volume: %d", ret);
+				}
 			}
-
 			break;
 
 		case BUTTON_VOLUME_DOWN:
-			ret = bt_r_and_c_volume_down();
-			if (ret) {
-				LOG_WRN("Failed to decrease volume: %d", ret);
+			if (IS_ENABLED(CONFIG_BT_MCC))
+			{
+				ret = bt_r_and_c_volume_down();
+				if (ret) {
+					LOG_WRN("Failed to decrease volume: %d", ret);
+				}
 			}
-
 			break;
 
 		case BUTTON_4:
@@ -211,7 +217,12 @@ static void le_audio_msg_sub_thread(void)
 				break;
 			}
 
-			if (msg.dir == BT_AUDIO_DIR_SOURCE) {
+			if (msg.dir == BT_AUDIO_DIR_SINK) {
+				LOG_DBG("LE_AUDIO_EVT_NOT_STREAMING: DIR_SINK: RX");
+				audio_system_encoder_stop();
+			}
+			else if (msg.dir == BT_AUDIO_DIR_SOURCE) {
+				LOG_DBG("LE_AUDIO_EVT_NOT_STREAMING: DIR_SOURCE: TX");
 				audio_system_encoder_stop();
 			}
 
