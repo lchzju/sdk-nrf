@@ -88,13 +88,13 @@ int sw_codec_encode(void *pcm_data, size_t pcm_size, uint8_t **encoded_data, siz
 	int ret;
 
 	/* Temp storage for split stereo PCM signal */
-	char pcm_data_mono_system_sample_rate[AUDIO_CH_NUM][PCM_NUM_BYTES_MONO] = {0};
+	char splitted_mono_pcm_data[AUDIO_CH_NUM][PCM_NUM_BYTES_MONO] = {0};
 	/* Make sure we have enough space for two frames (stereo) */
 	static uint8_t m_encoded_data[ENC_MAX_FRAME_SIZE * AUDIO_CH_NUM];
 
 	char pcm_data_mono_converted_buf[AUDIO_CH_NUM][PCM_NUM_BYTES_MONO] = {0};
 
-	size_t pcm_block_size_mono_system_sample_rate;
+	size_t pcm_block_size_splitted_mono;
 	size_t pcm_block_size_mono;
 
 	if (!m_config.encoder.enabled) {
@@ -105,34 +105,46 @@ int sw_codec_encode(void *pcm_data, size_t pcm_size, uint8_t **encoded_data, siz
 	switch (m_config.sw_codec) {
 	case SW_CODEC_LC3: {
 #if (CONFIG_SW_CODEC_LC3)
-		uint16_t encoded_bytes_written;
+		uint16_t encoded_bytes_in_channel[AUDIO_CH_NUM];
+		uint16_t encoded_bytes;
+
 		char *pcm_data_mono_ptrs[m_config.encoder.channel_mode];
 
 		/* Since LC3 is a single channel codec, we must split the
 		 * stereo PCM stream
 		 */
 		ret = pscm_two_channel_split(pcm_data, pcm_size, CONFIG_AUDIO_BIT_DEPTH_BITS,
-					     pcm_data_mono_system_sample_rate[AUDIO_CH_L],
-					     pcm_data_mono_system_sample_rate[AUDIO_CH_R],
-					     &pcm_block_size_mono_system_sample_rate);
+					     splitted_mono_pcm_data[AUDIO_CH_L],
+					     splitted_mono_pcm_data[AUDIO_CH_R],
+					     &pcm_block_size_splitted_mono);
 		if (ret) {
 			return ret;
 		}
+		else
+		{
+			LOG_DBG("pcm stream two channel split success, each has %d Bytes", pcm_block_size_splitted_mono);
+		}
 
-		//LOG_HEXDUMP_INF(pcm_data_mono_system_sample_rate[AUDIO_CH_L], 96, "Left");
-		//LOG_HEXDUMP_INF(pcm_data_mono_system_sample_rate[AUDIO_CH_R], 96, "Right");
+		//LOG_HEXDUMP_INF(splitted_mono_pcm_data[AUDIO_CH_L], 96, "Left");
+		//LOG_HEXDUMP_INF(splitted_mono_pcm_data[AUDIO_CH_R], 96, "Right");
 
 		for (int i = 0; i < m_config.encoder.channel_mode; ++i) {
 			ret = sw_codec_sample_rate_convert(
-				&encoder_converters[i], CONFIG_AUDIO_SAMPLE_RATE_HZ,
-				m_config.encoder.sample_rate_hz,
-				pcm_data_mono_system_sample_rate[i],
-				pcm_block_size_mono_system_sample_rate,
+				&encoder_converters[i], CONFIG_AUDIO_SAMPLE_RATE_HZ, /* I2S 48 kHz sample rates */
+				m_config.encoder.sample_rate_hz, /* 24 kHz for LC3 codec */
+				splitted_mono_pcm_data[i],
+				pcm_block_size_splitted_mono,
 				pcm_data_mono_converted_buf[i], &pcm_data_mono_ptrs[i],
 				&pcm_block_size_mono);
 			if (ret) {
 				LOG_ERR("Sample rate conversion failed for channel %d: %d", i, ret);
 				return ret;
+			}
+			else
+			{
+				LOG_DBG("Channel %d: Sample rate conversion: %dHz to %dHz, %d bytes to %d bytes", 
+				     i, CONFIG_AUDIO_SAMPLE_RATE_HZ, m_config.encoder.sample_rate_hz,
+					  pcm_block_size_splitted_mono, pcm_block_size_mono);
 			}
 		}
 
@@ -140,10 +152,14 @@ int sw_codec_encode(void *pcm_data, size_t pcm_size, uint8_t **encoded_data, siz
 		case SW_CODEC_MONO: {
 			ret = sw_codec_lc3_enc_run(pcm_data_mono_ptrs[AUDIO_CH_L],
 						   pcm_block_size_mono, LC3_USE_BITRATE_FROM_INIT,
-						   0, sizeof(m_encoded_data), m_encoded_data,
-						   &encoded_bytes_written);
+						   AUDIO_CH_L, sizeof(m_encoded_data), m_encoded_data,
+						   &encoded_bytes);
 			if (ret) {
 				return ret;
+			}
+			else
+			{
+				LOG_DBG("LC3 encoded success: from %d to %d bytes for mono", pcm_block_size_mono, encoded_bytes);
 			}
 			break;
 		}
@@ -151,20 +167,29 @@ int sw_codec_encode(void *pcm_data, size_t pcm_size, uint8_t **encoded_data, siz
 			ret = sw_codec_lc3_enc_run(pcm_data_mono_ptrs[AUDIO_CH_L],
 						   pcm_block_size_mono, LC3_USE_BITRATE_FROM_INIT,
 						   AUDIO_CH_L, sizeof(m_encoded_data),
-						   m_encoded_data, &encoded_bytes_written);
+						   m_encoded_data, &encoded_bytes_in_channel[AUDIO_CH_L]);
 			if (ret) {
 				return ret;
+			}
+			else
+			{
+				LOG_DBG("LC3 encoded success: from %d to %d bytes for left channel", pcm_block_size_mono, encoded_bytes_in_channel[AUDIO_CH_L]);
 			}
 
 			ret = sw_codec_lc3_enc_run(
 				pcm_data_mono_ptrs[AUDIO_CH_R], pcm_block_size_mono,
 				LC3_USE_BITRATE_FROM_INIT, AUDIO_CH_R,
-				sizeof(m_encoded_data) - encoded_bytes_written,
-				m_encoded_data + encoded_bytes_written, &encoded_bytes_written);
+				sizeof(m_encoded_data) - encoded_bytes_in_channel[AUDIO_CH_L],
+				m_encoded_data + encoded_bytes_in_channel[AUDIO_CH_L], &encoded_bytes_in_channel[AUDIO_CH_R]);
 			if (ret) {
 				return ret;
 			}
-			encoded_bytes_written += encoded_bytes_written;
+			else
+			{
+				LOG_DBG("LC3 encoded success: from %d to %d bytes for right channel", pcm_block_size_mono, encoded_bytes_in_channel[AUDIO_CH_R]);
+			}
+
+			encoded_bytes = encoded_bytes_in_channel[AUDIO_CH_L] + encoded_bytes_in_channel[AUDIO_CH_R];
 			break;
 		}
 		default:
@@ -174,7 +199,7 @@ int sw_codec_encode(void *pcm_data, size_t pcm_size, uint8_t **encoded_data, siz
 		}
 
 		*encoded_data = m_encoded_data;
-		*encoded_size = encoded_bytes_written;
+		*encoded_size = encoded_bytes;
 
 #endif /* (CONFIG_SW_CODEC_LC3) */
 		break;
@@ -227,7 +252,7 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, uint
 	static char pcm_data_stereo[PCM_NUM_BYTES_STEREO];
 
 	char decoded_data_mono[AUDIO_CH_NUM][PCM_NUM_BYTES_MONO] = {0};
-	char decoded_data_mono_system_sample_rate[AUDIO_CH_NUM][PCM_NUM_BYTES_MONO] = {0};
+	char decoded_data_rate_conversion_buffer[AUDIO_CH_NUM][PCM_NUM_BYTES_MONO] = {0};
 
 	size_t pcm_size_stereo = 0;
 	size_t pcm_size_mono = 0;
@@ -245,7 +270,7 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, uint
 				decoded_data_size = PCM_NUM_BYTES_MONO;
 			} else {
 				ret = sw_codec_lc3_dec_run(
-					encoded_data, encoded_size, LC3_PCM_NUM_BYTES_MONO, 0,
+					encoded_data, encoded_size, LC3_PCM_NUM_BYTES_MONO, AUDIO_CH_L,
 					decoded_data_mono[AUDIO_CH_L],
 					(uint16_t *)&decoded_data_size, bad_frame);
 				if (ret) {
@@ -253,7 +278,7 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, uint
 				}
 				else
 				{
-					LOG_DBG("LC3 decoded_data_size: %d for mono", decoded_data_size);
+					LOG_DBG("LC3 decoded from %d bytes to %d bytes for mono", encoded_size, decoded_data_size);
 				}
 
 				ret = sw_codec_sample_rate_convert(
@@ -261,7 +286,7 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, uint
 					m_config.decoder.sample_rate_hz,
 					CONFIG_AUDIO_SAMPLE_RATE_HZ, decoded_data_mono[AUDIO_CH_L],
 					decoded_data_size,
-					decoded_data_mono_system_sample_rate[AUDIO_CH_L],
+					decoded_data_rate_conversion_buffer[AUDIO_CH_L],
 					&pcm_in_data_ptrs[AUDIO_CH_L], &pcm_size_mono);
 				if (ret) {
 					LOG_ERR("Sample rate conversion failed for mono: %d", ret);
@@ -269,7 +294,9 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, uint
 				}
 				else
 				{
-					LOG_DBG("sample_rate_convert outputs pcm_size:%d for mono", decoded_data_size);
+					LOG_DBG("Mono Channel: Sample rate conversion: %dHz to %dHz, %d bytes to %d bytes", 
+					   m_config.decoder.sample_rate_hz, CONFIG_AUDIO_SAMPLE_RATE_HZ, 
+						decoded_data_size, pcm_size_mono);
 				}
 			}
 
@@ -293,15 +320,16 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, uint
 			} else {
 				/* Decode left channel */
 				ret = sw_codec_lc3_dec_run(
-					encoded_data, encoded_size / 2, LC3_PCM_NUM_BYTES_MONO,
-					AUDIO_CH_L, decoded_data_mono[AUDIO_CH_L],
+					encoded_data, encoded_size / 2, 
+					LC3_PCM_NUM_BYTES_MONO, AUDIO_CH_L, 
+					decoded_data_mono[AUDIO_CH_L],
 					(uint16_t *)&decoded_data_size, bad_frame & 0x01);
 				if (ret) {
 					return ret;
 				}
 				else
 				{
-					LOG_DBG("LC3 decoded_data_size: %d on left channel", decoded_data_size);
+					LOG_DBG("LC3 decoded from %d bytes to %d bytes for left channel", encoded_size/2, decoded_data_size);
 				}
 
 				/* Decode right channel */
@@ -315,7 +343,7 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, uint
 				}
 				else
 				{
-					LOG_DBG("LC3 decoded_data_size: %d on right channel", decoded_data_size);
+					LOG_DBG("LC3 decoded from %d bytes to %d bytes for right channel", encoded_size/2, decoded_data_size);
 				}
 
 				for (int i = 0; i < m_config.decoder.channel_mode; ++i) {
@@ -324,7 +352,7 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, uint
 						m_config.decoder.sample_rate_hz,
 						CONFIG_AUDIO_SAMPLE_RATE_HZ, decoded_data_mono[i],
 						decoded_data_size,
-						decoded_data_mono_system_sample_rate[i],
+						decoded_data_rate_conversion_buffer[i],
 						&pcm_in_data_ptrs[i], &pcm_size_mono);
 					if (ret) {
 						LOG_ERR("Sample rate conversion failed for channel "
@@ -334,7 +362,10 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, uint
 					}
 					else
 					{
-						LOG_DBG("sample_rate_convert outputs pcm_size:%d for channel:%d", pcm_size_mono, i);
+						LOG_DBG("Channel %d: Sample rate conversion: %dHz to %dHz, %d bytes to %d bytes", 
+							i, 
+							m_config.decoder.sample_rate_hz, CONFIG_AUDIO_SAMPLE_RATE_HZ, 
+							decoded_data_size, pcm_size_mono);
 					}
 				}
 			}

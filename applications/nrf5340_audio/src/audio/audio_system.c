@@ -68,14 +68,15 @@ static void audio_gateway_configure(void)
 	}
 
 #if (CONFIG_STREAM_BIDIRECTIONAL)
-	sw_codec_cfg.decoder.num_ch = 2;
-	sw_codec_cfg.decoder.channel_mode = SW_CODEC_STEREO;
+	sw_codec_cfg.decoder.num_ch = CONFIG_LC3_DEC_CHAN_MAX;
+	sw_codec_cfg.decoder.channel_mode =
+		(sw_codec_cfg.decoder.num_ch == 1) ? SW_CODEC_MONO : SW_CODEC_STEREO;
 #endif /* (CONFIG_STREAM_BIDIRECTIONAL) */
 
 	if (IS_ENABLED(CONFIG_MONO_TO_ALL_RECEIVERS)) {
 		sw_codec_cfg.encoder.num_ch = 1;
 	} else {
-		sw_codec_cfg.encoder.num_ch = 2;
+		sw_codec_cfg.encoder.num_ch = CONFIG_LC3_ENC_CHAN_MAX;
 	}
 
 	sw_codec_cfg.encoder.channel_mode =
@@ -91,12 +92,14 @@ static void audio_headset_configure(void)
 	}
 
 #if (CONFIG_STREAM_BIDIRECTIONAL)
-	sw_codec_cfg.encoder.num_ch = 1;
-	sw_codec_cfg.encoder.channel_mode = SW_CODEC_MONO;
+	sw_codec_cfg.encoder.num_ch = CONFIG_LC3_ENC_CHAN_MAX;
+	sw_codec_cfg.encoder.channel_mode =
+		(sw_codec_cfg.encoder.num_ch == 1) ? SW_CODEC_MONO : SW_CODEC_STEREO;
 #endif /* (CONFIG_STREAM_BIDIRECTIONAL) */
 
-	sw_codec_cfg.decoder.num_ch = 1;
-	sw_codec_cfg.decoder.channel_mode = SW_CODEC_MONO;
+	sw_codec_cfg.decoder.num_ch = CONFIG_LC3_DEC_CHAN_MAX;
+	sw_codec_cfg.decoder.channel_mode =
+		(sw_codec_cfg.decoder.num_ch == 1) ? SW_CODEC_MONO : SW_CODEC_STEREO;
 
 	if (IS_ENABLED(CONFIG_SD_CARD_PLAYBACK)) {
 		/* Need an extra decoder channel to decode data from SD card */

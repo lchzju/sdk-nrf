@@ -219,7 +219,6 @@ static void le_audio_msg_sub_thread(void)
 
 			if (msg.dir == BT_AUDIO_DIR_SINK) {
 				LOG_DBG("LE_AUDIO_EVT_NOT_STREAMING: DIR_SINK: RX");
-				audio_system_encoder_stop();
 			}
 			else if (msg.dir == BT_AUDIO_DIR_SOURCE) {
 				LOG_DBG("LE_AUDIO_EVT_NOT_STREAMING: DIR_SOURCE: TX");
