@@ -1287,8 +1287,8 @@ static void stream_stopped_cb(struct bt_bap_stream *stream, uint8_t reason)
 		}
 	}
 
-	le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING, stream->conn, BT_AUDIO_DIR_SINK);
-	//le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING, stream->conn, BT_AUDIO_DIR_SOURCE); //stop rx
+	//le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING, stream->conn, BT_AUDIO_DIR_SINK);
+	le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING, stream->conn, BT_AUDIO_DIR_SOURCE); //stop rx
 }
 
 static void stream_released_cb(struct bt_bap_stream *stream)
@@ -1309,8 +1309,8 @@ static void stream_released_cb(struct bt_bap_stream *stream)
 		}
 	}
 
-	le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING, stream->conn, BT_AUDIO_DIR_SINK);
-	//le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING, stream->conn, BT_AUDIO_DIR_SOURCE); //stop rx
+	//le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING, stream->conn, BT_AUDIO_DIR_SINK);
+	le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING, stream->conn, BT_AUDIO_DIR_SOURCE); //stop rx
 }
 
 #if (CONFIG_BT_AUDIO_RX)
