@@ -828,12 +828,12 @@ static void unicast_client_location_cb(struct bt_conn *conn, enum bt_audio_dir d
 	    (loc == BT_AUDIO_LOCATION_MONO_AUDIO)) {
 		unicast_server->location = BT_AUDIO_LOCATION_FRONT_LEFT;
 		unicast_server->ch_name = "LEFT";
-		LOG_DBG("LEFT location is found. loc = 0x%x", loc);
+		LOG_DBG("*LEFT* location is found. loc = 0x%x\r\n", loc);
 
 	} else if ((loc & BT_AUDIO_LOCATION_FRONT_RIGHT) || (loc & BT_AUDIO_LOCATION_SIDE_RIGHT)) {
 		unicast_server->location = BT_AUDIO_LOCATION_FRONT_RIGHT;
 		unicast_server->ch_name = "RIGHT";
-		LOG_DBG("RIGHT location is found. loc = 0x%x", loc);
+		LOG_DBG("*RIGHT* location is found. loc = 0x%x\r\n", loc);
 	} else {
 		LOG_WRN("Channel location not supported: loc = 0x%x", loc);
 		le_audio_event_publish(LE_AUDIO_EVT_NO_VALID_CFG, conn, dir);

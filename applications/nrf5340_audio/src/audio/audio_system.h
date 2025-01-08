@@ -72,7 +72,7 @@ int audio_system_config_set(uint32_t encoder_sample_rate_hz, uint32_t encoder_bi
  *
  * @return	0 on success, error otherwise.
  */
-int audio_system_decode(void const *const encoded_data, size_t encoded_data_size, bool bad_frame);
+int audio_system_decode(void const *const encoded_data, size_t encoded_data_size, bool bad_frame, uint8_t channel);
 
 /**
  * @brief	Initialize and start both HW and SW audio codec.

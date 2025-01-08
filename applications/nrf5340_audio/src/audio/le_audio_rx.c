@@ -152,11 +152,11 @@ static void audio_datapath_thread(void *dummy1, void *dummy2, void *dummy3)
 							&iso_received_size, K_FOREVER);
 		ERR_CHK(ret);
 
-		LOG_DBG("iso received data size: %d", iso_received->data_size);
+		LOG_DBG("iso received data size: %d, ch: %d", iso_received->data_size, iso_received->channel );
 
 		if (IS_ENABLED(CONFIG_AUDIO_SOURCE_USB) && (CONFIG_AUDIO_DEV == GATEWAY)) {
 			ret = audio_system_decode(iso_received->data, iso_received->data_size,
-						  iso_received->bad_frame);
+						  iso_received->bad_frame, iso_received->channel);
 			ERR_CHK(ret);
 		} else {
 			audio_datapath_stream_out(iso_received->data, iso_received->data_size,

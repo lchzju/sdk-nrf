@@ -944,7 +944,7 @@ void audio_datapath_stream_out(const uint8_t *buf, size_t size, uint32_t sdu_ref
 		//uint32_t delta_us = abs(sdu_ref_us - ctrl_blk.prev_pres_sdu_ref_us) ;
 		//LOG_DBG("delta_us: %u", delta_us);
 
-		LOG_DBG("On a different channel");
+		//LOG_DBG("On a different channel");
 		if (channel == 0) 
 		{
 			memcpy(stereo_encoded_data, buf, size);

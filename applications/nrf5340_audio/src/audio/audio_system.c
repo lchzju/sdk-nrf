@@ -280,8 +280,10 @@ int audio_system_config_set(uint32_t encoder_sample_rate_hz, uint32_t encoder_bi
 	return 0;
 }
 
+#define DATA_SIZE_IN_BYTES_PER_CHANNEL  (60)
+
 /* This function is only used on gateway using USB as audio source and bidirectional stream */
-int audio_system_decode(void const *const encoded_data, size_t encoded_data_size, bool bad_frame)
+int audio_system_decode(void const *const encoded_data, size_t encoded_data_size, bool bad_frame, uint8_t channel)
 {
 	int ret;
 	uint32_t blocks_alloced_num;
@@ -291,6 +293,11 @@ int audio_system_decode(void const *const encoded_data, size_t encoded_data_size
 	static void *pcm_raw_data;
 	size_t pcm_block_size;
 
+	static uint8_t prev_channel = 0;
+	static uint8_t stereo_encoded_data[DATA_SIZE_IN_BYTES_PER_CHANNEL * 2] = {0};
+	uint8_t bad_frame_mask = 0;
+
+
 	if (!sw_codec_cfg.initialized) {
 		/* Throw away data */
 		/* This can happen when using play/pause since there might be
@@ -299,6 +306,8 @@ int audio_system_decode(void const *const encoded_data, size_t encoded_data_size
 		LOG_DBG("Trying to decode while codec is not initialized");
 		return -EPERM;
 	}
+
+	LOG_DBG("%u bytes from channel[%d] to be decoded", encoded_data_size, channel);
 
 	ret = data_fifo_num_used_get(&fifo_tx, &blocks_alloced_num, &blocks_locked_num);
 	if (ret) {
@@ -331,11 +340,51 @@ int audio_system_decode(void const *const encoded_data, size_t encoded_data_size
 		}
 	}
 
-	ret = sw_codec_decode(encoded_data, encoded_data_size, bad_frame, &pcm_raw_data,
-			      &pcm_block_size);
+	/* Lincoln adds code, start */
+	if ( 2 == audio_system_decoder_num_ch_get() )
+	{
+		if (bad_frame) 
+		{
+			/* Error in the frame or frame lost - sdu_ref_us is still valid */
+			LOG_DBG("Bad audio frame");
+			if (channel == 0) 
+			{
+				bad_frame_mask |= 0x01;
+			} 
+			else 
+			{
+				bad_frame_mask |= 0x02;
+			}
+		} 
+		else 
+		{
+			bad_frame_mask = 0;
+		}
+
+		if (channel == 0) 
+		{
+			memcpy(stereo_encoded_data, encoded_data, encoded_data_size);
+		} 
+		else 
+		{
+			memcpy(stereo_encoded_data + encoded_data_size, encoded_data, encoded_data_size);
+		}
+		prev_channel = channel;
+	}
+
+	if (2 == audio_system_decoder_num_ch_get())
+	{
+		ret = sw_codec_decode(stereo_encoded_data, encoded_data_size * 2, bad_frame_mask, &pcm_raw_data, &pcm_block_size);
+	}
+	else
+/* Lincoln adds code, end */
+	{
+		ret = sw_codec_decode(encoded_data, encoded_data_size, bad_frame_mask, &pcm_raw_data,
+				&pcm_block_size);
+	}
+
 	if (ret) {
-		LOG_ERR("Failed to decode");
-		return ret;
+		LOG_WRN("SW codec decode error: %d", ret);
 	}
 
 	/* Split decoded frame into CONFIG_FIFO_FRAME_SPLIT_NUM blocks */

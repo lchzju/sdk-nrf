@@ -38,7 +38,10 @@ config USB_DRIVER_LOG_LEVEL
 	default 1
 
 config USB_DEVICE_LOG_LEVEL
-	default 1
+	default 4
+
+config USB_AUDIO_LOG_LEVEL
+	default 4
 
 endif # AUDIO_SOURCE_USB
 

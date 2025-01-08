@@ -142,9 +142,9 @@ int sw_codec_encode(void *pcm_data, size_t pcm_size, uint8_t **encoded_data, siz
 			}
 			else
 			{
-				LOG_DBG("Channel %d: Sample rate conversion: %dHz to %dHz, %d bytes to %d bytes", 
-				     i, CONFIG_AUDIO_SAMPLE_RATE_HZ, m_config.encoder.sample_rate_hz,
-					  pcm_block_size_splitted_mono, pcm_block_size_mono);
+				//LOG_DBG("Channel %d: Sample rate conversion: %dHz to %dHz, %d bytes to %d bytes", 
+				     //i, CONFIG_AUDIO_SAMPLE_RATE_HZ, m_config.encoder.sample_rate_hz,
+					 // pcm_block_size_splitted_mono, pcm_block_size_mono);
 			}
 		}
 
@@ -294,9 +294,9 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, uint
 				}
 				else
 				{
-					LOG_DBG("Mono Channel: Sample rate conversion: %dHz to %dHz, %d bytes to %d bytes", 
-					   m_config.decoder.sample_rate_hz, CONFIG_AUDIO_SAMPLE_RATE_HZ, 
-						decoded_data_size, pcm_size_mono);
+					//LOG_DBG("Mono Channel: Sample rate conversion: %dHz to %dHz, %d bytes to %d bytes", 
+					  // m_config.decoder.sample_rate_hz, CONFIG_AUDIO_SAMPLE_RATE_HZ, 
+						//decoded_data_size, pcm_size_mono);
 				}
 			}
 
@@ -362,10 +362,10 @@ int sw_codec_decode(uint8_t const *const encoded_data, size_t encoded_size, uint
 					}
 					else
 					{
-						LOG_DBG("Channel %d: Sample rate conversion: %dHz to %dHz, %d bytes to %d bytes", 
-							i, 
-							m_config.decoder.sample_rate_hz, CONFIG_AUDIO_SAMPLE_RATE_HZ, 
-							decoded_data_size, pcm_size_mono);
+						//LOG_DBG("Channel %d: Sample rate conversion: %dHz to %dHz, %d bytes to %d bytes", 
+							//i, 
+							//m_config.decoder.sample_rate_hz, CONFIG_AUDIO_SAMPLE_RATE_HZ, 
+							//decoded_data_size, pcm_size_mono);
 					}
 				}
 			}
